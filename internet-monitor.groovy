@@ -5,10 +5,11 @@
 
 metadata {
     definition (
-		name: 'Internet Connection Sensor', 
-		namespace: 'hugoh', 
-		author: 'Hugo Haas',
-	) {
+        name: 'Internet Connection Sensor', 
+        namespace: 'hugoh', 
+        author: 'Hugo Haas',
+        importUrl: 'https://github.com/hugoh/hubitat-internet-monitor/blob/release/internet-monitor.groovy'
+    ) {
         capability 'PresenceSensor'
         capability 'Refresh'
 
