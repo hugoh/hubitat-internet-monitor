@@ -65,7 +65,7 @@ boolean isHostReachable(String ip) {
 boolean checkInternetIsUp() {
     logDebug('Checking for Internet connectivity')
     boolean isUp = false
-    for (String target: settings.ipAddresses.split('[, ]+')) {
+    for (String target: getRandomizedList(settings.ipAddresses)) {
         if (isHostReachable(target)) {
             sendEvent(name: 'lastReachedIp', value: target)
             isUp = true
@@ -93,6 +93,18 @@ void checkInternetLoop() {
         nextRun = settings.pollingIntervalWhenDown
     logDebug("Scheduling next check in ${nextRun} seconds")
     runIn(nextRun, "checkInternetLoop")
+}
+
+// --------------------------------------------------------------------------
+
+List getRandomizedList(String commaSeparatedString) {
+    String[] items = commaSeparatedString.split('[, ]+')
+    ArrayList<String> list = new ArrayList<String>(items.length)
+    for (String i: items) {
+        list.add(i)
+    }
+    Collections.shuffle(list)
+    return list
 }
 
 void logDebug(String msg) {
