@@ -16,29 +16,55 @@ metadata {
         capability 'Refresh'
 
         attribute 'lastUpdateTime', 'string'
-        attribute 'lastReachedIp', 'string'
+        attribute 'lastReachedTarget', 'string'
         attribute 'lastReachedTime', 'string'
     }   
 }
 
-@Field static final List DefaultPingHosts = ['1.1.1.1', '8.8.8.8', '9.9.9.9']
+@Field static final List DefaultCheckedUrls = [
+    'http://www.gstatic.com/generate_204',
+    'http://www.msftncsi.com/ncsi.txt',
+    'http://detectportal.firefox.com/'
+    ]
+@Field static final List DefaultPingHosts = [
+    '1.1.1.1',
+    '8.8.8.8',
+    '9.9.9.9'
+    ]
 
 preferences {
     input('pollingInterval', 'number', title: 'Polling interval in seconds when Internet is up',
         defaultValue: 300, required: true)
     input('pollingIntervalWhenDown', 'number', title: 'Polling interval in seconds when Internet is down',
         defaultValue: 60, required: true)
-    input('pingHosts', 'string', title: 'Hosts to monitor via ping',
+    input('checkedUrls', 'string', title: 'URLs to check via HTTP',
+        description: 'Comma-separated list of URLs',
+        defaultValue: DefaultCheckedUrls.join(','), required: true)
+    input('pingHosts', 'string', title: 'Hosts to check via ping',
         description: 'Comma-separated list of IP addresses or hostnames',
         defaultValue: DefaultPingHosts.join(','), required: true)
     input('logEnable', 'bool', title: 'Enable debug logging', defaultValue: false)
 }
 
+@Field List CheckedUrls
 @Field List PingHosts
+@Field static final String ICMP = 'ICMP'
+@Field static final String HTTP = 'HTTP'
 
 def initialize() {
     log.info('Starting Internet checking loop')
-    PingHosts = splitString(settings.pingHosts)
+    // Parse settings and use defaults in case of validation issue
+    try {
+        CheckedUrls = splitString(settings.checkedUrls)
+    } catch (Exception ex) {
+        CheckedUrls = DefaultCheckedUrls
+    }
+    try {
+        PingHosts = splitString(settings.pingHosts)
+    } catch (Exception ex) {
+        PingHosts = DefaultPingHosts
+    }
+    // Start loop
     checkInternetLoop()
 }
 
@@ -52,37 +78,63 @@ def updated() {
     refresh()
 }
 
-boolean ping(String ip) {
-    hubitat.helper.NetworkUtils.PingData pingData = hubitat.helper.NetworkUtils.ping(ip, 1)
+boolean get(String url) {
+    boolean ret
+    httpGet(url) { resp ->
+        ret = resp.isSuccess()
+    }
+    return ret
+}
+
+boolean ping(String host) {
+    hubitat.helper.NetworkUtils.PingData pingData = hubitat.helper.NetworkUtils.ping(host, 1)
     return pingData?.packetsReceived
 }
 
-boolean isHostReachableByICMP(String ip) {
+boolean isTargetReachable(String target, String type) {
     final int maxTries = 3
-    logDebug("[ICMP] Testing ${ip} at most ${maxTries} times")
+    logDebug("[${type}] Testing ${target} at most ${maxTries} times")
     boolean reachable = false
     int i
     for (i = 1; i <= maxTries; i++) {
-        if (ping(ip)) {
+        boolean reached
+        if (type == HTTP) {
+            reached = get(target)
+        } else if (type == ICMP) {
+            reached = ping(target)
+        } else {
+            throw new Exception("Unsupported test type ${type}")
+        }
+        if (reached) {
             reachable = true
             break
         }
         pauseExecution(1000)
     }
-    logDebug("[ICMP] Reachable = ${reachable} for ${ip}; packets sent: ${i}")
+    logDebug("[${type}] Reachable = ${reachable} for ${target}; tries: ${i}")
     return reachable
+}
+
+boolean runChecks(List targets, String type) {
+    logDebug("Running ${type} checks")
+    boolean isUp = false
+    Collections.shuffle(targets)
+    for (String target: targets) {
+        if (isTargetReachable(target, type)) {
+            sendEvent(name: 'lastReachedTarget', value: target)
+            isUp = true
+            break
+        }
+    }
+    return isUp
 }
 
 boolean checkInternetIsUp() {
     logDebug('Checking for Internet connectivity')
-    boolean isUp = false
-    Collections.shuffle(PingHosts)
-    for (String target: PingHosts) {
-        if (isHostReachableByICMP(target)) {
-            sendEvent(name: 'lastReachedIp', value: target)
-            isUp = true
-            break
-        }
+    boolean isUp
+    isUp = runChecks(CheckedUrls, HTTP)
+    if (!isUp) {
+        isUp = runChecks(PingHosts, ICMP)
     }
     String now = new Date().toString()
     String presence
