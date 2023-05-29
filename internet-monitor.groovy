@@ -3,6 +3,8 @@
  * based on Ping Presence Sensor by Ashish Chaudhari
  */
 
+import groovy.transform.Field
+
 metadata {
     definition (
         name: 'Internet Connection Sensor', 
@@ -19,19 +21,24 @@ metadata {
     }   
 }
 
+@Field static final List DefaultPingHosts = ['1.1.1.1', '8.8.8.8', '9.9.9.9']
+
 preferences {
     input('pollingInterval', 'number', title: 'Polling interval in seconds when Internet is up',
         defaultValue: 300, required: true)
     input('pollingIntervalWhenDown', 'number', title: 'Polling interval in seconds when Internet is down',
         defaultValue: 60, required: true)
-    input('ipAddresses', 'string', title: 'IP addresses to monitor via ping',
-        description: 'Comma-separated list of IP addresses',
-        defaultValue:'1.1.1.1,8.8.8.8,9.9.9.9', required: true)
+    input('pingHosts', 'string', title: 'Hosts to monitor via ping',
+        description: 'Comma-separated list of IP addresses or hostnames',
+        defaultValue: DefaultPingHosts.join(','), required: true)
     input('logEnable', 'bool', title: 'Enable debug logging', defaultValue: false)
 }
 
+@Field List PingHosts
+
 def initialize() {
     log.info('Starting Internet checking loop')
+    PingHosts = splitString(settings.pingHosts)
     checkInternetLoop()
 }
 
@@ -69,7 +76,8 @@ boolean isHostReachableByICMP(String ip) {
 boolean checkInternetIsUp() {
     logDebug('Checking for Internet connectivity')
     boolean isUp = false
-    for (String target: getRandomizedList(settings.ipAddresses)) {
+    Collections.shuffle(PingHosts)
+    for (String target: PingHosts) {
         if (isHostReachableByICMP(target)) {
             sendEvent(name: 'lastReachedIp', value: target)
             isUp = true
@@ -101,13 +109,12 @@ void checkInternetLoop() {
 
 // --------------------------------------------------------------------------
 
-List getRandomizedList(String commaSeparatedString) {
+List splitString(String commaSeparatedString) {
     String[] items = commaSeparatedString.split('[, ]+')
     ArrayList<String> list = new ArrayList<String>(items.length)
     for (String i: items) {
         list.add(i)
     }
-    Collections.shuffle(list)
     return list
 }
 
