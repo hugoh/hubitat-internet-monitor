@@ -45,20 +45,24 @@ def updated() {
     refresh()
 }
 
-boolean isHostReachable(String ip) {
+boolean ping(String ip) {
+    hubitat.helper.NetworkUtils.PingData pingData = hubitat.helper.NetworkUtils.ping(ip, 1)
+    return pingData?.packetsReceived
+}
+
+boolean isHostReachableByICMP(String ip) {
     final int maxTries = 3
-    logDebug("Testing ${ip} at most ${maxTries} times")
+    logDebug("[ICMP] Testing ${ip} at most ${maxTries} times")
     boolean reachable = false
     int i
     for (i = 1; i <= maxTries; i++) {
-        hubitat.helper.NetworkUtils.PingData pingData = hubitat.helper.NetworkUtils.ping(ip, 1)
-        if (pingData?.packetsReceived) {
+        if (ping(ip)) {
             reachable = true
             break
         }
         pauseExecution(1000)
     }
-    logDebug("Reachable = ${reachable} for ${ip}; packets sent: ${i}")
+    logDebug("[ICMP] Reachable = ${reachable} for ${ip}; packets sent: ${i}")
     return reachable
 }
 
@@ -66,7 +70,7 @@ boolean checkInternetIsUp() {
     logDebug('Checking for Internet connectivity')
     boolean isUp = false
     for (String target: getRandomizedList(settings.ipAddresses)) {
-        if (isHostReachable(target)) {
+        if (isHostReachableByICMP(target)) {
             sendEvent(name: 'lastReachedIp', value: target)
             isUp = true
             break
