@@ -116,7 +116,11 @@ boolean isTargetReachable(String target, String type) {
         }
         pauseExecution(1000)
     }
-    logDebug("[${type}] Reachable = ${reachable} for ${target}; tries: ${i}")
+    if (reachable) {
+        logDebug("[${type}] Reached ${target} after ${i} tries")
+    } else {
+        log.error("[${type}] Could not reach ${target}")
+    }
     return reachable
 }
 
