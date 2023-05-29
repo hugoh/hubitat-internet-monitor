@@ -26,7 +26,7 @@ preferences {
         defaultValue: 60, required: true)
     input('ipAddresses', 'string', title: 'IP addresses to monitor via ping',
         description: 'Comma-separated list of IP addresses',
-        defaultValue:'1.1.1.1,8.8.8.8', required: true)
+        defaultValue:'1.1.1.1,8.8.8.8,9.9.9.9', required: true)
     input('logEnable', 'bool', title: 'Enable debug logging', defaultValue: false)
 }
 
