@@ -98,12 +98,17 @@ boolean isTargetReachable(String target, String type) {
     int i
     for (i = 1; i <= maxTries; i++) {
         boolean reached
-        if (type == HTTP) {
-            reached = get(target)
-        } else if (type == ICMP) {
-            reached = ping(target)
-        } else {
-            throw new Exception("Unsupported test type ${type}")
+        try {
+            if (type == HTTP) {
+                reached = get(target)
+            } else if (type == ICMP) {
+                reached = ping(target)
+            } else {
+                throw new Exception("Unsupported test type ${type}")
+            }
+        } catch (java.net.UnknownHostException ex) {
+            log.error("Could not resolve ${target}")
+            reached = false
         }
         if (reached) {
             reachable = true
