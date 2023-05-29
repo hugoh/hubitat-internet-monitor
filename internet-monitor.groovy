@@ -14,6 +14,8 @@ metadata {
         capability 'Refresh'
 
         attribute 'lastUpdateTime', 'string'
+        attribute 'lastReachedIp', 'string'
+        attribute 'lastReachedTime', 'string'
     }   
 }
 
@@ -65,15 +67,21 @@ boolean checkInternetIsUp() {
     boolean isUp = false
     for (String target: settings.ipAddresses.split('[, ]+')) {
         if (isHostReachable(target)) {
+            sendEvent(name: 'lastReachedIp', value: target)
             isUp = true
             break
         }
     }
-    if (isUp)
-        sendEvent(name:"presence", value:"present")
-    else
-        sendEvent(name:"presence", value:"not present")
-    sendEvent(name:"lastUpdateTime", value:(new Date().toString()))
+    String now = new Date().toString()
+    String presence
+    if (isUp) {
+        presence = 'present'
+        sendEvent(name: 'lastReachedTime', value: now)
+    } else {
+        presence = 'not present'
+    }
+    sendEvent(name: 'presence', value: presence)
+    sendEvent(name: 'lastUpdateTime', value: now)
     return isUp
 }
 
