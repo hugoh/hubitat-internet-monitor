@@ -1,0 +1,19 @@
+{
+  "packageName": "hubitat-internet-monitor",
+  "version": "0.1.20230530",
+  "documentationLink": "https://github.com/hugoh/hubitat-internet-monitor/blob/release/README.md",
+  "author": "Hugo Haas",
+  "category": "Utility",
+  "tags": "Cloud",
+  "drivers": [
+     {
+      "id": "BB72907A-E68A-4012-85CE-E647ADA5E30C",
+      "name": "internet-monitor",
+      "namespace": "hugoh",
+      "location": "https://raw.githubusercontent.com/hugoh/hubitat-internet-monitor/release/internet-monitor.groovy",
+      "required": true,
+      "oauth": false,
+      "description": "Internet monitor"
+     }
+  ]
+}
