@@ -14,6 +14,8 @@ A series of HTTP requests are attempted, and then a series of pings. As soon as 
 
 The list of URLs and hosts are configurable and rotated after each test.
 
+### Check loop
+
 When the connection is up, tests are run every 5 minutes (configurable). When it's down, they're run every minute (also configurable).
 
 ## Credits
