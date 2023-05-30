@@ -6,9 +6,9 @@
 import groovy.transform.Field
 
 metadata {
-    definition (
-        name: 'Internet Connection Sensor', 
-        namespace: 'hugoh', 
+    definition(
+        name: 'Internet Connection Sensor',
+        namespace: 'hugoh',
         author: 'Hugo Haas',
         importUrl: 'https://github.com/hugoh/hubitat-internet-monitor/blob/release/internet-monitor.groovy'
     ) {
@@ -46,35 +46,35 @@ preferences {
     input('logEnable', 'bool', title: 'Enable debug logging', defaultValue: false)
 }
 
-@Field List CheckedUrls
-@Field List PingHosts
 @Field static final String ICMP = 'ICMP'
 @Field static final String HTTP = 'HTTP'
 
-def initialize() {
+void initialize() {
     log.info('Starting Internet checking loop')
     // Parse settings and use defaults in case of validation issue
     try {
         CheckedUrls = splitString(settings.checkedUrls)
     } catch (Exception ex) {
+        log.error("Using checked URLs defaults: ${ex.message}")
         CheckedUrls = DefaultCheckedUrls
     }
     try {
         PingHosts = splitString(settings.pingHosts)
     } catch (Exception ex) {
+        log.error("Using ping hosts defaults: ${ex.message}")
         PingHosts = DefaultPingHosts
     }
     // Start loop
-    checkInternetLoop()
+    checkInternetLoop([checkedUrls: CheckedUrls, pingHosts: PingHosts])
 }
 
-def refresh() {
-    log.info('Stopping any pending checks')
+void refresh() {
+    log.info('Canceling any pending scheduled tasks')
     unschedule()
     initialize()
 }
 
-def updated() {
+void updated() {
     refresh()
 }
 
@@ -116,14 +116,17 @@ boolean isTargetReachable(String target, String type) {
         }
         pauseExecution(1000)
     }
-    logDebug("[${type}] Reachable = ${reachable} for ${target}; tries: ${i}")
+    if (reachable) {
+        logDebug("[${type}] Reached ${target} after ${i} tries")
+    } else {
+        log.error("[${type}] Could not reach ${target}")
+    }
     return reachable
 }
 
 boolean runChecks(List targets, String type) {
     logDebug("Running ${type} checks")
     boolean isUp = false
-    Collections.shuffle(targets)
     for (String target: targets) {
         if (isTargetReachable(target, type)) {
             sendEvent(name: 'lastReachedTarget', value: target)
@@ -131,16 +134,15 @@ boolean runChecks(List targets, String type) {
             break
         }
     }
+    Collections.rotate(targets, 1)
     return isUp
 }
 
-boolean checkInternetIsUp() {
+boolean checkInternetIsUp(List checkedUrls, List pingHosts) {
     logDebug('Checking for Internet connectivity')
     boolean isUp
-    isUp = runChecks(CheckedUrls, HTTP)
-    if (!isUp) {
-        isUp = runChecks(PingHosts, ICMP)
-    }
+    isUp = runChecks(checkedUrls, HTTP)
+    isUp = isUp ?: runChecks(pingHosts, ICMP)
     String now = new Date().toString()
     String presence
     if (isUp) {
@@ -154,21 +156,20 @@ boolean checkInternetIsUp() {
     return isUp
 }
 
-void checkInternetLoop() {
-    boolean isUp = checkInternetIsUp()
-    if (isUp)
-        nextRun = settings.pollingInterval
-    else
-        nextRun = settings.pollingIntervalWhenDown
+void checkInternetLoop(data) {
+    List checkedUrls = data.checkedUrls
+    List pingHosts = data.pingHosts
+    boolean isUp = checkInternetIsUp(checkedUrls, pingHosts)
+    nextRun = isUp ? settings.pollingInterval : settings.pollingIntervalWhenDown
     logDebug("Scheduling next check in ${nextRun} seconds")
-    runIn(nextRun, "checkInternetLoop")
+    runIn(nextRun, "checkInternetLoop", [data: [checkedUrls: checkedUrls, pingHosts: pingHosts]])
 }
 
 // --------------------------------------------------------------------------
 
 List splitString(String commaSeparatedString) {
     String[] items = commaSeparatedString.split('[, ]+')
-    ArrayList<String> list = new ArrayList<String>(items.length)
+    List<String> list = new ArrayList<String>(items.length)
     for (String i: items) {
         list.add(i)
     }
