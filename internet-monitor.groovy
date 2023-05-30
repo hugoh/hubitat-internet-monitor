@@ -18,7 +18,7 @@ metadata {
         attribute 'lastUpdateTime', 'string'
         attribute 'lastReachedTarget', 'string'
         attribute 'lastReachedTime', 'string'
-    }   
+    }
 }
 
 @Field static final List DefaultCheckedUrls = [
@@ -162,7 +162,7 @@ void checkInternetLoop(data) {
     boolean isUp = checkInternetIsUp(checkedUrls, pingHosts)
     nextRun = isUp ? settings.pollingInterval : settings.pollingIntervalWhenDown
     logDebug("Scheduling next check in ${nextRun} seconds")
-    runIn(nextRun, "checkInternetLoop", [data: [checkedUrls: checkedUrls, pingHosts: pingHosts]])
+    runIn(nextRun, 'checkInternetLoop', [data: [checkedUrls: checkedUrls, pingHosts: pingHosts]])
 }
 
 // --------------------------------------------------------------------------
