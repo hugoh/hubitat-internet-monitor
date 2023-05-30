@@ -3,8 +3,8 @@
 This is a Hubitat driver to report on whether the Internet connection is up or down.
 
 The driver exposes a presence sensor:
-  * When the internet is up, the presence sensor is set to present.
-  * When the internet is detected as down, it is set as not present.
+* When the internet is up, the presence sensor is set to present.
+* When the internet is detected as down, it is set as not present.
 
 ## Logic
 
