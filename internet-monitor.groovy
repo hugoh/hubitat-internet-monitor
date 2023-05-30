@@ -6,9 +6,9 @@
 import groovy.transform.Field
 
 metadata {
-    definition (
-        name: 'Internet Connection Sensor', 
-        namespace: 'hugoh', 
+    definition(
+        name: 'Internet Connection Sensor',
+        namespace: 'hugoh',
         author: 'Hugo Haas',
         importUrl: 'https://github.com/hugoh/hubitat-internet-monitor/blob/release/internet-monitor.groovy'
     ) {
@@ -49,30 +49,32 @@ preferences {
 @Field static final String ICMP = 'ICMP'
 @Field static final String HTTP = 'HTTP'
 
-def initialize() {
+void initialize() {
     log.info('Starting Internet checking loop')
     // Parse settings and use defaults in case of validation issue
     try {
         CheckedUrls = splitString(settings.checkedUrls)
     } catch (Exception ex) {
+        log.error("Using checked URLs defaults: ${ex.message}")
         CheckedUrls = DefaultCheckedUrls
     }
     try {
         PingHosts = splitString(settings.pingHosts)
     } catch (Exception ex) {
+        log.error("Using ping hosts defaults: ${ex.message}")
         PingHosts = DefaultPingHosts
     }
     // Start loop
     checkInternetLoop([checkedUrls: CheckedUrls, pingHosts: PingHosts])
 }
 
-def refresh() {
-    log.info('Stopping any pending checks')
+void refresh() {
+    log.info('Canceling any pending scheduled tasks')
     unschedule()
     initialize()
 }
 
-def updated() {
+void updated() {
     refresh()
 }
 
@@ -136,13 +138,11 @@ boolean runChecks(List targets, String type) {
     return isUp
 }
 
-boolean checkInternetIsUp(checkedUrls, pingHosts) {
+boolean checkInternetIsUp(List checkedUrls, List pingHosts) {
     logDebug('Checking for Internet connectivity')
     boolean isUp
     isUp = runChecks(checkedUrls, HTTP)
-    if (!isUp) {
-        isUp = runChecks(pingHosts, ICMP)
-    }
+    isUp = isUp ?: runChecks(pingHosts, ICMP)
     String now = new Date().toString()
     String presence
     if (isUp) {
@@ -160,10 +160,7 @@ void checkInternetLoop(data) {
     List checkedUrls = data.checkedUrls
     List pingHosts = data.pingHosts
     boolean isUp = checkInternetIsUp(checkedUrls, pingHosts)
-    if (isUp)
-        nextRun = settings.pollingInterval
-    else
-        nextRun = settings.pollingIntervalWhenDown
+    nextRun = isUp ? settings.pollingInterval : settings.pollingIntervalWhenDown
     logDebug("Scheduling next check in ${nextRun} seconds")
     runIn(nextRun, "checkInternetLoop", [data: [checkedUrls: checkedUrls, pingHosts: pingHosts]])
 }
@@ -172,7 +169,7 @@ void checkInternetLoop(data) {
 
 List splitString(String commaSeparatedString) {
     String[] items = commaSeparatedString.split('[, ]+')
-    LinkedList<String> list = new LinkedList<String>(items.length)
+    List<String> list = new ArrayList<String>(items.length)
     for (String i: items) {
         list.add(i)
     }
