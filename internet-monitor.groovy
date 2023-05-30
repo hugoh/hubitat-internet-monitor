@@ -46,8 +46,6 @@ preferences {
     input('logEnable', 'bool', title: 'Enable debug logging', defaultValue: false)
 }
 
-@Field List CheckedUrls
-@Field List PingHosts
 @Field static final String ICMP = 'ICMP'
 @Field static final String HTTP = 'HTTP'
 
@@ -65,7 +63,7 @@ def initialize() {
         PingHosts = DefaultPingHosts
     }
     // Start loop
-    checkInternetLoop()
+    checkInternetLoop([checkedUrls: CheckedUrls, pingHosts: PingHosts])
 }
 
 def refresh() {
@@ -127,7 +125,9 @@ boolean isTargetReachable(String target, String type) {
 boolean runChecks(List targets, String type) {
     logDebug("Running ${type} checks")
     boolean isUp = false
+    logDebug(targets.join(' '))
     Collections.shuffle(targets)
+    logDebug(targets.join(' '))
     for (String target: targets) {
         if (isTargetReachable(target, type)) {
             sendEvent(name: 'lastReachedTarget', value: target)
@@ -138,12 +138,12 @@ boolean runChecks(List targets, String type) {
     return isUp
 }
 
-boolean checkInternetIsUp() {
+boolean checkInternetIsUp(checkedUrls, pingHosts) {
     logDebug('Checking for Internet connectivity')
     boolean isUp
-    isUp = runChecks(CheckedUrls, HTTP)
+    isUp = runChecks(checkedUrls, HTTP)
     if (!isUp) {
-        isUp = runChecks(PingHosts, ICMP)
+        isUp = runChecks(pingHosts, ICMP)
     }
     String now = new Date().toString()
     String presence
@@ -158,14 +158,16 @@ boolean checkInternetIsUp() {
     return isUp
 }
 
-void checkInternetLoop() {
-    boolean isUp = checkInternetIsUp()
+void checkInternetLoop(data) {
+    List checkedUrls = data.checkedUrls
+    List pingHosts = data.pingHosts
+    boolean isUp = checkInternetIsUp(checkedUrls, pingHosts)
     if (isUp)
         nextRun = settings.pollingInterval
     else
         nextRun = settings.pollingIntervalWhenDown
     logDebug("Scheduling next check in ${nextRun} seconds")
-    runIn(nextRun, "checkInternetLoop")
+    runIn(nextRun, "checkInternetLoop", [data: [checkedUrls: checkedUrls, pingHosts: pingHosts]])
 }
 
 // --------------------------------------------------------------------------
