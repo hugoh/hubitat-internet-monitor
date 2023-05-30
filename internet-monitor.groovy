@@ -5,6 +5,20 @@
 
 import groovy.transform.Field
 
+@Field static final String ICMP = 'ICMP'
+@Field static final String HTTP = 'HTTP'
+@Field static final String LAST_REACHED_TARGET = 'lastReachedTarget'
+@Field static final String LAST_REACHED_TIME = 'lastReachedTime'
+@Field static final String LAST_UPDATE_TIME = 'lastUpdateTime'
+
+@Field static final String BOOL = 'bool'
+@Field static final String NUMBER = 'number'
+@Field static final String STRING = 'string'
+
+@Field static final String PRESENCE = 'presence'
+@Field static final String PRESENT_TRUE = 'present'
+@Field static final String PRESENT_FALSE = 'not present'
+
 metadata {
     definition(
         name: 'Internet Connection Sensor',
@@ -15,9 +29,9 @@ metadata {
         capability 'PresenceSensor'
         capability 'Refresh'
 
-        attribute 'lastUpdateTime', 'string'
-        attribute 'lastReachedTarget', 'string'
-        attribute 'lastReachedTime', 'string'
+        attribute LAST_REACHED_TARGET, STRING
+        attribute LAST_REACHED_TIME, STRING
+        attribute LAST_UPDATE_TIME, STRING
     }
 }
 
@@ -33,39 +47,26 @@ metadata {
     ]
 
 preferences {
-    input('pollingInterval', 'number', title: 'Polling interval in seconds when Internet is up',
+    input('pollingInterval', NUMBER, title: 'Polling interval in seconds when Internet is up',
         defaultValue: 300, required: true)
-    input('pollingIntervalWhenDown', 'number', title: 'Polling interval in seconds when Internet is down',
+    input('pollingIntervalWhenDown', NUMBER, title: 'Polling interval in seconds when Internet is down',
         defaultValue: 60, required: true)
-    input('checkedUrls', 'string', title: 'URLs to check via HTTP',
+    input('checkedUrls', STRING, title: 'URLs to check via HTTP',
         description: 'Comma-separated list of URLs',
         defaultValue: DefaultCheckedUrls.join(','), required: true)
-    input('pingHosts', 'string', title: 'Hosts to check via ping',
+    input('pingHosts', STRING, title: 'Hosts to check via ping',
         description: 'Comma-separated list of IP addresses or hostnames',
         defaultValue: DefaultPingHosts.join(','), required: true)
-    input('logEnable', 'bool', title: 'Enable debug logging', defaultValue: false)
+    input('logEnable', BOOL, title: 'Enable debug logging', defaultValue: false)
 }
-
-@Field static final String ICMP = 'ICMP'
-@Field static final String HTTP = 'HTTP'
 
 void initialize() {
     log.info('Starting Internet checking loop')
     // Parse settings and use defaults in case of validation issue
-    try {
-        CheckedUrls = splitString(settings.checkedUrls)
-    } catch (Exception ex) {
-        log.error("Using checked URLs defaults: ${ex.message}")
-        CheckedUrls = DefaultCheckedUrls
-    }
-    try {
-        PingHosts = splitString(settings.pingHosts)
-    } catch (Exception ex) {
-        log.error("Using ping hosts defaults: ${ex.message}")
-        PingHosts = DefaultPingHosts
-    }
+    checkedUrls = splitString(settings.checkedUrls, DefaultCheckedUrls)
+    pingHosts = splitString(settings.pingHosts, DefaultPingHosts)
     // Start loop
-    checkInternetLoop([checkedUrls: CheckedUrls, pingHosts: PingHosts])
+    checkInternetLoop([checkedUrls: checkedUrls, pingHosts: pingHosts])
 }
 
 void refresh() {
@@ -129,7 +130,7 @@ boolean runChecks(List targets, String type) {
     boolean isUp = false
     for (String target: targets) {
         if (isTargetReachable(target, type)) {
-            sendEvent(name: 'lastReachedTarget', value: target)
+            sendEvent(name: LAST_REACHED_TARGET, value: target)
             isUp = true
             break
         }
@@ -143,20 +144,20 @@ boolean checkInternetIsUp(List checkedUrls, List pingHosts) {
     boolean isUp
     isUp = runChecks(checkedUrls, HTTP)
     isUp = isUp ?: runChecks(pingHosts, ICMP)
-    String now = new Date().toString()
+    String now = new Date() // groovylint-disable-line NoJavaUtilDate
     String presence
     if (isUp) {
-        presence = 'present'
-        sendEvent(name: 'lastReachedTime', value: now)
+        presence = PRESENT_TRUE
+        sendEvent(name: LAST_REACHED_TIME, value: now)
     } else {
-        presence = 'not present'
+        presence = PRESENT_FALSE
     }
-    sendEvent(name: 'presence', value: presence)
-    sendEvent(name: 'lastUpdateTime', value: now)
+    sendEvent(name: PRESENCE, value: presence)
+    sendEvent(name: LAST_UPDATE_TIME, value: now)
     return isUp
 }
 
-void checkInternetLoop(data) {
+void checkInternetLoop(Map data) {
     List checkedUrls = data.checkedUrls
     List pingHosts = data.pingHosts
     boolean isUp = checkInternetIsUp(checkedUrls, pingHosts)
@@ -167,7 +168,11 @@ void checkInternetLoop(data) {
 
 // --------------------------------------------------------------------------
 
-List splitString(String commaSeparatedString) {
+List splitString(String commaSeparatedString, List defaultValue) {
+    if (commaSeparatedString == null) {
+        log.info("No settings value, using default ${defaultValue}")
+        return defaultValue
+    }
     String[] items = commaSeparatedString.split('[, ]+')
     List<String> list = new ArrayList<String>(items.length)
     for (String i: items) {
