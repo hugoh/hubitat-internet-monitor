@@ -125,9 +125,6 @@ boolean isTargetReachable(String target, String type) {
 boolean runChecks(List targets, String type) {
     logDebug("Running ${type} checks")
     boolean isUp = false
-    logDebug(targets.join(' '))
-    Collections.shuffle(targets)
-    logDebug(targets.join(' '))
     for (String target: targets) {
         if (isTargetReachable(target, type)) {
             sendEvent(name: 'lastReachedTarget', value: target)
@@ -135,6 +132,7 @@ boolean runChecks(List targets, String type) {
             break
         }
     }
+    Collections.rotate(targets, 1)
     return isUp
 }
 
@@ -174,7 +172,7 @@ void checkInternetLoop(data) {
 
 List splitString(String commaSeparatedString) {
     String[] items = commaSeparatedString.split('[, ]+')
-    ArrayList<String> list = new ArrayList<String>(items.length)
+    LinkedList<String> list = new LinkedList<String>(items.length)
     for (String i: items) {
         list.add(i)
     }
