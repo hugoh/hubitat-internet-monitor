@@ -19,6 +19,8 @@ import groovy.transform.Field
 @Field static final String PRESENT_TRUE = 'present'
 @Field static final String PRESENT_FALSE = 'not present'
 
+public static final String version() { return "0.1.20230530" }
+
 metadata {
     definition(
         name: 'Internet Connection Sensor',
@@ -61,7 +63,7 @@ preferences {
 }
 
 void initialize() {
-    log.info('Starting Internet checking loop')
+    log.info("Starting Internet checking loop - version ${version()}")
     // Parse settings and use defaults in case of validation issue
     checkedUrls = splitString(settings.checkedUrls, DefaultCheckedUrls)
     pingHosts = splitString(settings.pingHosts, DefaultPingHosts)
