@@ -9,12 +9,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: Set branch-based environment variables
-        uses: iamtheyammer/branch-env-vars@v1.2.1
-        with:
-          DRY_RUN: |
-            master:false
-            !default:true
       - name: Bump version and push tag
         uses: jasonamyers/github-bumpversion-action@v1.0.5
         env:
