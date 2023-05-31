@@ -24,7 +24,7 @@ metadata {
         name: 'Internet Connection Sensor',
         namespace: 'hugoh',
         author: 'Hugo Haas',
-        importUrl: 'https://github.com/hugoh/hubitat-internet-monitor/blob/release/internet-monitor.groovy'
+        importUrl: 'https://github.com/hugoh/hubitat-internet-monitor/blob/master/internet-monitor.groovy'
     ) {
         capability 'PresenceSensor'
         capability 'Refresh'
@@ -108,7 +108,7 @@ boolean isTargetReachable(String target, String type) {
                 throw new Exception("Unsupported test type ${type}")
             }
         } catch (java.net.UnknownHostException ex) {
-            log.error("Could not resolve ${target}")
+            log.warn("Could not resolve ${target}: ${ex.message}")
             reached = false
         }
         if (reached) {
@@ -120,7 +120,7 @@ boolean isTargetReachable(String target, String type) {
     if (reachable) {
         logDebug("[${type}] Reached ${target} after ${i} tries")
     } else {
-        log.error("[${type}] Could not reach ${target}")
+        log.warn("[${type}] Could not reach ${target} after ${maxTries} tries")
     }
     return reachable
 }
