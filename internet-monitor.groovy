@@ -24,7 +24,7 @@ metadata {
         name: 'Internet Connection Sensor',
         namespace: 'hugoh',
         author: 'Hugo Haas',
-        importUrl: 'https://github.com/hugoh/hubitat-internet-monitor/blob/release/internet-monitor.groovy'
+        importUrl: 'https://github.com/hugoh/hubitat-internet-monitor/blob/master/internet-monitor.groovy'
     ) {
         capability 'PresenceSensor'
         capability 'Refresh'
