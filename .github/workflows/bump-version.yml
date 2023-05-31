@@ -2,13 +2,13 @@
 name: Bump version
 on:
   push:
-    branches:
-      - master
+  pull_request:
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: Bump version and push tag
         uses: jasonamyers/github-bumpversion-action@v1.0.5
         env:
@@ -16,6 +16,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Push changes
         uses: ad-m/github-push-action@master
+        # NOTE: GitHub action permissions need to be set to read/write
+        if: github.ref == 'refs/heads/master'
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          tags: true
