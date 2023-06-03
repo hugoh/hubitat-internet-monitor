@@ -2,6 +2,7 @@
   "packageName": "hubitat-internet-monitor",
   "version": "0.2.0",
   "documentationLink": "https://github.com/hugoh/hubitat-internet-monitor/blob/master/README.md",
+  "communityLink": "https://community.hubitat.com/t/release-internet-connection-monitor/119585",
   "author": "Hugo Haas",
   "category": "Utility",
   "tags": "Cloud",
