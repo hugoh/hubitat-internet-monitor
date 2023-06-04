@@ -151,8 +151,10 @@ boolean checkInternetIsUp(List checkedUrls, List pingHosts) {
     if (isUp) {
         presence = PRESENT_TRUE
         sendEvent(name: LAST_REACHED_TIME, value: now)
+        log.info('Internet is up')
     } else {
         presence = PRESENT_FALSE
+        log.warn('Internet is down: all tests failed')
     }
     sendEvent(name: PRESENCE, value: presence)
     sendEvent(name: LAST_UPDATE_TIME, value: now)
