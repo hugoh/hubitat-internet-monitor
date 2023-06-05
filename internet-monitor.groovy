@@ -109,8 +109,8 @@ boolean isTargetReachable(String target, String type) {
             } else {
                 throw new Exception("Unsupported test type ${type}")
             }
-        } catch (java.net.UnknownHostException ex) {
-            log.warn("Could not resolve ${target}: ${ex.message}")
+        } catch (java.io.IOException ex) {
+            log.warn("Could not reach ${target}: ${ex.message}")
             reached = false
         }
         if (reached) {
