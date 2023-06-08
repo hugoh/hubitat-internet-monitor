@@ -10,6 +10,8 @@ import groovy.transform.Field
 @Field static final String LAST_REACHED_TARGET = 'lastReachedTarget'
 @Field static final String LAST_REACHED_TIME = 'lastReachedTime'
 @Field static final String LAST_UPDATE_TIME = 'lastUpdateTime'
+@Field static final String LAST_UPDATE_LATENCY = 'lastUpdateLatency'
+@Field static final String LAST_UPDATE_EXCEEDED_THRESHOLD = 'lastUpdateExceededThreshold'
 
 @Field static final String BOOL = 'bool'
 @Field static final String NUMBER = 'number'
@@ -34,6 +36,8 @@ metadata {
         attribute LAST_REACHED_TARGET, STRING
         attribute LAST_REACHED_TIME, STRING
         attribute LAST_UPDATE_TIME, STRING
+        attribute LAST_UPDATE_LATENCY, NUMBER
+        attribute LAST_UPDATE_EXCEEDED_THRESHOLD, BOOL
     }
 }
 
@@ -59,26 +63,33 @@ preferences {
     input('pingHosts', STRING, title: 'Hosts to check via ping',
         description: 'Comma-separated list of IP addresses or hostnames',
         defaultValue: DefaultPingHosts.join(','), required: true)
+    input('httpThreshold', NUMBER, title: 'Warn latency threshold for HTTP checks')
+    input('pingThreshold', NUMBER, title: 'Warn latency threshold for ping checks')
     input('logEnable', BOOL, title: 'Enable debug logging', defaultValue: false)
 }
 
 void initialize() {
     log.info("Starting Internet checking loop - version ${version()}")
     // Parse settings and use defaults in case of validation issue
-    checkedUrls = splitString(settings.checkedUrls, DefaultCheckedUrls)
-    pingHosts = splitString(settings.pingHosts, DefaultPingHosts)
+    state.checkedUrls = splitString(settings.checkedUrls, DefaultCheckedUrls)
+    state.pingHosts = splitString(settings.pingHosts, DefaultPingHosts)
+    state.warnThresholds = [
+        (HTTP): positiveValue(settings.httpThreshold),
+        (ICMP): positiveValue(settings.pingThreshold)
+    ]
     // Start loop
-    checkInternetLoop([checkedUrls: checkedUrls, pingHosts: pingHosts])
+    checkInternetLoop()
 }
 
 void refresh() {
-    log.info('Canceling any pending scheduled tasks')
-    unschedule()
-    initialize()
+    log.info('Manual refresh')
+    checkInternetIsUp()
 }
 
 void updated() {
-    refresh()
+    log.info('Canceling any pending scheduled tasks')
+    unschedule()
+    initialize()
 }
 
 boolean get(String url) {
@@ -101,6 +112,7 @@ boolean isTargetReachable(String target, String type) {
     int i
     for (i = 1; i <= maxTries; i++) {
         boolean reached
+        start = now()
         try {
             if (type == HTTP) {
                 reached = get(target)
@@ -109,6 +121,7 @@ boolean isTargetReachable(String target, String type) {
             } else {
                 throw new Exception("Unsupported test type ${type}")
             }
+            end = now()
         } catch (java.io.IOException ex) {
             log.warn("Could not reach ${target}: ${ex.message}")
             reached = false
@@ -120,7 +133,15 @@ boolean isTargetReachable(String target, String type) {
         pauseExecution(1000)
     }
     if (reachable) {
-        logDebug("[${type}] Reached ${target} after ${i} tries")
+        reachedIn = end - start
+        boolean reachThresholdExceeded = false
+        sendEvent(name: LAST_UPDATE_LATENCY, value: reachedIn)
+        logDebug("[${type}] Reached ${target} in ${reachedIn}ms after ${i} tries")
+        if (state.warnThresholds[type] > 0 && reachedIn >= state.warnThresholds[type]) {
+            reachThresholdExceeded = true
+            log.warn("Target ${target} reached but latency exceeded threshold; took ${reachedIn}ms")
+        }
+        sendEvent(name: LAST_UPDATE_EXCEEDED_THRESHOLD, value: reachThresholdExceeded)
     } else {
         log.warn("[${type}] Could not reach ${target} after ${maxTries} tries")
     }
@@ -141,11 +162,11 @@ boolean runChecks(List targets, String type) {
     return isUp
 }
 
-boolean checkInternetIsUp(List checkedUrls, List pingHosts) {
+boolean checkInternetIsUp() {
     logDebug('Checking for Internet connectivity')
     boolean isUp
-    isUp = runChecks(checkedUrls, HTTP)
-    isUp = isUp ?: runChecks(pingHosts, ICMP)
+    isUp = runChecks(state.checkedUrls, HTTP)
+    isUp = isUp ?: runChecks(state.pingHosts, ICMP)
     String now = new Date() // groovylint-disable-line NoJavaUtilDate
     String presence
     if (isUp) {
@@ -161,16 +182,18 @@ boolean checkInternetIsUp(List checkedUrls, List pingHosts) {
     return isUp
 }
 
-void checkInternetLoop(Map data) {
-    List checkedUrls = data.checkedUrls
-    List pingHosts = data.pingHosts
-    boolean isUp = checkInternetIsUp(checkedUrls, pingHosts)
+void checkInternetLoop() {
+    boolean isUp = checkInternetIsUp()
     nextRun = isUp ? settings.pollingInterval : settings.pollingIntervalWhenDown
     logDebug("Scheduling next check in ${nextRun} seconds")
-    runIn(nextRun, 'checkInternetLoop', [data: [checkedUrls: checkedUrls, pingHosts: pingHosts]])
+    runIn(nextRun, 'checkInternetLoop')
 }
 
 // --------------------------------------------------------------------------
+
+int positiveValue(v) {
+    return v == null ? 0 : Math.max(v, 0)
+}
 
 List splitString(String commaSeparatedString, List defaultValue) {
     if (commaSeparatedString == null) {
