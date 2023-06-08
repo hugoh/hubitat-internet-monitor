@@ -21,7 +21,7 @@ import groovy.transform.Field
 @Field static final String PRESENT_TRUE = 'present'
 @Field static final String PRESENT_FALSE = 'not present'
 
-public static final String version() { return '0.4.1' }
+public static final String version() { return '0.4.2' }
 
 metadata {
     definition(
