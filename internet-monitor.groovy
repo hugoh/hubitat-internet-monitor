@@ -11,7 +11,6 @@ import groovy.transform.Field
 @Field static final String LAST_REACHED_TIME = 'lastReachedTime'
 @Field static final String LAST_UPDATE_TIME = 'lastUpdateTime'
 @Field static final String LAST_UPDATE_LATENCY = 'lastUpdateLatency'
-@Field static final String LAST_UPDATE_EXCEEDED_THRESHOLD = 'lastUpdateExceededThreshold'
 
 @Field static final String BOOL = 'bool'
 @Field static final String NUMBER = 'number'
@@ -20,6 +19,8 @@ import groovy.transform.Field
 @Field static final String PRESENCE = 'presence'
 @Field static final String PRESENT_TRUE = 'present'
 @Field static final String PRESENT_FALSE = 'not present'
+
+@Field static final BigDecimal WARN_THRESHOLD = 2 / 3
 
 public static final String version() { return '0.5.1' }
 
@@ -37,7 +38,6 @@ metadata {
         attribute LAST_REACHED_TIME, STRING
         attribute LAST_UPDATE_TIME, STRING
         attribute LAST_UPDATE_LATENCY, NUMBER
-        attribute LAST_UPDATE_EXCEEDED_THRESHOLD, BOOL
     }
 }
 
@@ -63,8 +63,8 @@ preferences {
     input('pingHosts', STRING, title: 'Hosts to check via ping',
         description: 'Comma-separated list of IP addresses or hostnames',
         defaultValue: DefaultPingHosts.join(','), required: true)
-    input('httpThreshold', NUMBER, title: 'Warn latency threshold for HTTP checks')
-    input('pingThreshold', NUMBER, title: 'Warn latency threshold for ping checks')
+    input('httpThreshold', NUMBER, title: 'Error latency threshold for HTTP checks')
+    input('pingThreshold', NUMBER, title: 'Error latency threshold for ping checks')
     input('logEnable', BOOL, title: 'Enable debug logging', defaultValue: false)
 }
 
@@ -73,10 +73,14 @@ void initialize() {
     // Parse settings and use defaults in case of validation issue
     state.checkedUrls = splitString(settings.checkedUrls, DefaultCheckedUrls)
     state.pingHosts = splitString(settings.pingHosts, DefaultPingHosts)
-    state.warnThresholds = [
+    state.errorThresholds = [
         (HTTP): positiveValue(settings.httpThreshold),
         (ICMP): positiveValue(settings.pingThreshold)
     ]
+    state.warnThresholds = [:]
+    for (t in [HTTP, ICMP]) {
+        state.warnThresholds[t] = (int) Math.floor(state.errorThresholds[t] * WARN_THRESHOLD)
+    }
     // Start loop
     checkInternetLoop()
 }
@@ -119,12 +123,26 @@ boolean isTargetReachable(String target, String type) {
             } else if (type == ICMP) {
                 reached = ping(target)
             } else {
-                throw new Exception("Unsupported test type ${type}")
+                throw new IllegalArgumentException("Unsupported test type ${type}")
             }
-            end = now()
+            reachedIn = now() - start
         } catch (java.io.IOException ex) {
             log.warn("Could not reach ${target}: ${ex.message}")
             reached = false
+        }
+        if (reached) {
+            if (state.errorThresholds?."$type" > 0) {
+                warnType = null
+                if (reachedIn > state.errorThresholds."$type") {
+                    warnType = 'error'
+                    reached = false
+                } else if (reachedIn > state.warnThresholds?."$type") {
+                    warnType = 'warn'
+                }
+                if (warnType) {
+                    log.warn("Target ${target} reached but latency exceeded ${warnType} threshold; took ${reachedIn}ms")
+                }
+            }
         }
         if (reached) {
             reachable = true
@@ -133,15 +151,8 @@ boolean isTargetReachable(String target, String type) {
         pauseExecution(1000)
     }
     if (reachable) {
-        reachedIn = end - start
-        boolean reachThresholdExceeded = false
         sendEvent(name: LAST_UPDATE_LATENCY, value: reachedIn)
         logDebug("[${type}] Reached ${target} in ${reachedIn}ms after ${i} tries")
-        if (state.warnThresholds[type] > 0 && reachedIn >= state.warnThresholds[type]) {
-            reachThresholdExceeded = true
-            log.warn("Target ${target} reached but latency exceeded threshold; took ${reachedIn}ms")
-        }
-        sendEvent(name: LAST_UPDATE_EXCEEDED_THRESHOLD, value: reachThresholdExceeded)
     } else {
         log.warn("[${type}] Could not reach ${target} after ${maxTries} tries")
     }
@@ -191,8 +202,8 @@ void checkInternetLoop() {
 
 // --------------------------------------------------------------------------
 
-int positiveValue(v) {
-    return v == null ? 0 : Math.max(v, 0)
+BigDecimal positiveValue(BigDecimal v) {
+    return v == null ? 0 : Math.max(v, (double) 0)
 }
 
 List splitString(String commaSeparatedString, List defaultValue) {
