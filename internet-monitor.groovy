@@ -22,7 +22,7 @@ import groovy.transform.Field
 
 @Field static final BigDecimal WARN_THRESHOLD = 2 / 3
 
-public static final String version() { return '0.5.1' }
+public static final String version() { return '0.6.0' }
 
 metadata {
     definition(
