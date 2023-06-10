@@ -12,6 +12,11 @@ The driver exposes a presence sensor:
 
 A series of HTTP requests are attempted, and then a series of pings. As soon as one check is successful, the connection is detected as up.
 
+Optionally, a latency error threshold can be specified in the configuration.
+When the response time for an HTTP request or an ICMP ping exceed the error
+threshold, the check is considered as failed. This allows to detect situations
+where the connection is still up but very deteriorated.
+
 The list of URLs and hosts are configurable and rotated after each test.
 
 ### Check loop
