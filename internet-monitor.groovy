@@ -32,6 +32,7 @@ metadata {
         importUrl: 'https://github.com/hugoh/hubitat-internet-monitor/blob/master/internet-monitor.groovy'
     ) {
         capability 'PresenceSensor'
+        capability 'HealthCheck'
         capability 'Refresh'
 
         attribute LAST_REACHED_TARGET, STRING
@@ -53,6 +54,8 @@ metadata {
     ]
 
 preferences {
+    // FIXME? Spec says this should be called checkInterval
+    // See https://docs2.hubitat.com/developer/driver/capability-list
     input('pollingInterval', NUMBER, title: 'Polling interval in seconds when Internet is up',
         defaultValue: 300, required: true)
     input('pollingIntervalWhenDown', NUMBER, title: 'Polling interval in seconds when Internet is down',
@@ -85,9 +88,13 @@ void initialize() {
     checkInternetLoop()
 }
 
-void refresh() {
+void ping() {
     log.info('Manual refresh')
     checkInternetIsUp()
+}
+
+void refresh() {
+    updated()
 }
 
 void updated() {
