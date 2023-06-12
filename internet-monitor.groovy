@@ -127,20 +127,17 @@ boolean isTargetReachable(String target, String type) {
             }
             reachedIn = now() - start
         } catch (java.io.IOException ex) {
-            log.warn("Could not reach ${target}: ${ex.message}")
+            log.error("Could not reach ${target}: ${ex.message}")
             reached = false
         }
         if (reached) {
             if (state.errorThresholds?."$type" > 0) {
-                warnType = null
+                final thresholdMsg = 'Target %s reached but latency exceeded threshold; took %dms'
                 if (reachedIn > state.errorThresholds."$type") {
-                    warnType = 'error'
+                    log.error(sprintf(thresholdMsg, target, reachedIn))
                     reached = false
                 } else if (reachedIn > state.warnThresholds?."$type") {
-                    warnType = 'warn'
-                }
-                if (warnType) {
-                    log.warn("Target ${target} reached but latency exceeded ${warnType} threshold; took ${reachedIn}ms")
+                    log.warn(sprintf(thresholdMsg, target, reachedIn))
                 }
             }
         }
@@ -154,7 +151,7 @@ boolean isTargetReachable(String target, String type) {
         sendEvent(name: LAST_UPDATE_LATENCY, value: reachedIn)
         logDebug("[${type}] Reached ${target} in ${reachedIn}ms after ${i} tries")
     } else {
-        log.warn("[${type}] Could not reach ${target} after ${maxTries} tries")
+        log.error("[${type}] Could not reach ${target} after ${maxTries} tries")
     }
     return reachable
 }
@@ -186,7 +183,7 @@ boolean checkInternetIsUp() {
         log.info('Internet is up')
     } else {
         presence = PRESENT_FALSE
-        log.warn('Internet is down: all tests failed')
+        log.error('Internet is down: all tests failed')
     }
     sendEvent(name: PRESENCE, value: presence)
     sendEvent(name: LAST_UPDATE_TIME, value: now)
