@@ -23,6 +23,7 @@ import groovy.transform.Field
 @Field static final int ERROR_THRESHOLD_DEFAULT = 10000
 @Field static final int HTTP_TIMEOUT_DEFAULT = 20
 @Field static final BigDecimal WARN_THRESHOLD = 2 / 3
+@Field static final int CHECK_INTERVAL = 1000
 
 public static final String version() { return '0.8.0' }
 
@@ -125,22 +126,29 @@ void updated() {
 
 boolean get(String uri) {
     boolean ret
-    httpGet([
+    req = [
         'uri': uri,
         'timeout': state.httpTimeout
-    ]) { resp ->
+    ]
+    logDebug("Sending HTTP request ${req}")
+    httpGet(req) { resp ->
         ret = resp.isSuccess()
     }
+    logDebug("HTTP request ${req} success: ${ret}")
     return ret
 }
 
 boolean ping(String host) {
+    logDebug("Sending ICMP ping to ${host}")
     hubitat.helper.NetworkUtils.PingData pingData = hubitat.helper.NetworkUtils.ping(host, 1)
-    return pingData?.packetsReceived
+    ret = pingData?.packetsReceived
+    logDebug("Received ICMP ping response from ${host}: ${ret}")
+    return ret
 }
 
 boolean isTargetReachable(String target, String type) {
     final int maxTries = 3
+    final int retryIn = 1000
     logDebug("[${type}] Testing ${target} at most ${maxTries} times")
     boolean reachable = false
     int i
@@ -175,7 +183,8 @@ boolean isTargetReachable(String target, String type) {
             reachable = true
             break
         }
-        pauseExecution(1000)
+        logDebug("Retrying in ${CHECK_INTERVAL}ms")
+        pauseExecution(CHECK_INTERVAL)
     }
     if (reachable) {
         sendEvent(name: LAST_UPDATE_LATENCY, value: reachedIn)
@@ -183,6 +192,7 @@ boolean isTargetReachable(String target, String type) {
     } else {
         log.error("[${type}] Could not reach ${target} after ${maxTries} tries")
     }
+    logDebug("[${type}] Reached ${target}: ${reachable}")
     return reachable
 }
 
@@ -197,6 +207,7 @@ boolean runChecks(List targets, String type) {
         }
     }
     Collections.rotate(targets, 1)
+    logDebug("${type} checks successful: ${isUp}")
     return isUp
 }
 
