@@ -25,7 +25,7 @@ import groovy.transform.Field
 @Field static final BigDecimal WARN_THRESHOLD = 2 / 3
 @Field static final int HTTP_CHECK_INTERVAL = 500
 
-public static final String version() { return '0.8.0' }
+public static final String version() { return '0.9.0' }
 
 metadata {
     definition(
