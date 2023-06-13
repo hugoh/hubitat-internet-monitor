@@ -23,7 +23,7 @@ import groovy.transform.Field
 @Field static final int ERROR_THRESHOLD_DEFAULT = 10000
 @Field static final int HTTP_TIMEOUT_DEFAULT = 20
 @Field static final BigDecimal WARN_THRESHOLD = 2 / 3
-@Field static final int CHECK_INTERVAL = 1000
+@Field static final int HTTP_CHECK_INTERVAL = 500
 
 public static final String version() { return '0.8.0' }
 
@@ -148,7 +148,6 @@ boolean ping(String host) {
 
 boolean isTargetReachable(String target, String type) {
     final int maxTries = 3
-    final int retryIn = 1000
     logDebug("[${type}] Testing ${target} at most ${maxTries} times")
     boolean reachable = false
     int i
@@ -183,8 +182,10 @@ boolean isTargetReachable(String target, String type) {
             reachable = true
             break
         }
-        logDebug("Retrying in ${CHECK_INTERVAL}ms")
-        pauseExecution(CHECK_INTERVAL)
+        if (type == HTTP) {
+            logDebug("Retrying in ${HTTP_CHECK_INTERVAL}ms")
+            pauseExecution(HTTP_CHECK_INTERVAL)
+        }
     }
     if (reachable) {
         sendEvent(name: LAST_UPDATE_LATENCY, value: reachedIn)
