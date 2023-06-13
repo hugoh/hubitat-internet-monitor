@@ -127,7 +127,7 @@ boolean get(String uri) {
     boolean ret
     httpGet([
         'uri': uri,
-        'timeout': state.httpTimeout ?: HTTP_TIMEOUT_DEFAULT
+        'timeout': state.httpTimeout
     ]) { resp ->
         ret = resp.isSuccess()
     }
