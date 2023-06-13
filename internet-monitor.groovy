@@ -20,6 +20,8 @@ import groovy.transform.Field
 @Field static final String PRESENT_TRUE = 'present'
 @Field static final String PRESENT_FALSE = 'not present'
 
+@Field static final int ERROR_THRESHOLD_DEFAULT = 10000
+@Field static final int HTTP_TIMEOUT_DEFAULT = 20
 @Field static final BigDecimal WARN_THRESHOLD = 2 / 3
 
 public static final String version() { return '0.8.0' }
@@ -66,30 +68,48 @@ preferences {
     input('pingHosts', STRING, title: 'Hosts to check via ping',
         description: 'Comma-separated list of IP addresses or hostnames',
         defaultValue: DefaultPingHosts.join(','), required: true)
-    input('httpThreshold', NUMBER, title: 'Error latency threshold for HTTP checks')
-    input('pingThreshold', NUMBER, title: 'Error latency threshold for ping checks')
+    input('httpThreshold', NUMBER, title: 'Error latency threshold for HTTP checks (in ms)',
+        defaultValue: ERROR_THRESHOLD_DEFAULT, required: true)
+    input('pingThreshold', NUMBER, title: 'Error latency threshold for ping checks (in ms)',
+        defaultValue: ERROR_THRESHOLD_DEFAULT)
     input('logEnable', BOOL, title: 'Enable debug logging', defaultValue: false)
 }
 
-void initialize() {
-    log.info("Starting Internet checking loop - version ${version()}")
-    // Parse settings and use defaults in case of validation issue
+void initializeState() {
+    log.info("Initializing state for version ${version()}")
     state.checkedUrls = splitString(settings.checkedUrls, DefaultCheckedUrls)
     state.pingHosts = splitString(settings.pingHosts, DefaultPingHosts)
     state.errorThresholds = [
         (HTTP): positiveValue(settings.httpThreshold),
         (ICMP): positiveValue(settings.pingThreshold)
     ]
+    state.httpTimeout = state.errorThresholds[HTTP] ? // This is in seconds for httpGet
+        (int) Math.ceil(state.errorThresholds[HTTP] * 1.5 / 1000) :
+        HTTP_TIMEOUT_DEFAULT
     state.warnThresholds = [:]
     for (t in [HTTP, ICMP]) {
         state.warnThresholds[t] = (int) Math.floor(state.errorThresholds[t] * WARN_THRESHOLD)
     }
-    // Start loop
+}
+
+void ensureValidState() {
+    if (state.checkedUrls &&
+        state.pingHosts &&
+        state.errorThresholds &&
+        state.httpTimeout) {
+        return
+    }
+    // Something's missing
+    initializeState()
+}
+
+void initialize() {
+    log.info("Starting Internet checking loop - version ${version()}")
+    initializeState()
     checkInternetLoop()
 }
 
 void ping() {
-    log.info('Manual refresh')
     checkInternetIsUp()
 }
 
@@ -103,9 +123,12 @@ void updated() {
     initialize()
 }
 
-boolean get(String url) {
+boolean get(String uri) {
     boolean ret
-    httpGet(url) { resp ->
+    httpGet([
+        'uri': uri,
+        'timeout': state.httpTimeout ?: HTTP_TIMEOUT_DEFAULT
+    ]) { resp ->
         ret = resp.isSuccess()
     }
     return ret
@@ -139,7 +162,7 @@ boolean isTargetReachable(String target, String type) {
         }
         if (reached) {
             if (state.errorThresholds?."$type" > 0) {
-                final thresholdMsg = 'Target %s reached but latency exceeded threshold; took %dms'
+                final String thresholdMsg = 'Target %s reached but latency exceeded threshold; took %dms'
                 if (reachedIn > state.errorThresholds."$type") {
                     log.error(sprintf(thresholdMsg, target, reachedIn))
                     reached = false
@@ -179,6 +202,7 @@ boolean runChecks(List targets, String type) {
 
 boolean checkInternetIsUp() {
     logDebug('Checking for Internet connectivity')
+    ensureValidState()
     boolean isUp
     isUp = runChecks(state.checkedUrls, HTTP)
     isUp = isUp ?: runChecks(state.pingHosts, ICMP)
