@@ -84,7 +84,7 @@ void initializeState() {
         (ICMP): positiveValue(settings.pingThreshold)
     ]
     state.httpTimeout = state.errorThresholds[HTTP] ? // This is in seconds for httpGet
-        (int) Math.ceil(state.errorThresholds[HTTP] * 1.5 / 1000) :
+        (int) Math.ceil(state.errorThresholds[HTTP] / 1000) :
         HTTP_TIMEOUT_DEFAULT
     state.warnThresholds = [:]
     for (t in [HTTP, ICMP]) {
