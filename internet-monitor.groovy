@@ -59,11 +59,9 @@ metadata {
     ]
 
 preferences {
-    // FIXME? Spec says this should be called checkInterval
-    // See https://docs2.hubitat.com/developer/driver/capability-list
-    input('pollingInterval', NUMBER, title: 'Polling interval in seconds when Internet is up',
+    input('checkInterval', NUMBER, title: 'Polling interval in seconds when Internet is up',
         defaultValue: 300, required: true)
-    input('pollingIntervalWhenDown', NUMBER, title: 'Polling interval in seconds when Internet is down',
+    input('checkIntervalWhenDown', NUMBER, title: 'Polling interval in seconds when Internet is down',
         defaultValue: 60, required: true)
     input('checkedUrls', STRING, title: 'URLs to check via HTTP',
         description: 'Comma-separated list of URLs',
@@ -110,7 +108,7 @@ void poll() {
 }
 
 private void scheduleNextPoll(boolean isUp) {
-    nextRun = isUp ? settings.pollingInterval : settings.pollingIntervalWhenDown
+    nextRun = isUp ? settings.checkInterval : settings.checkIntervalWhenDown
     logDebug("Scheduling next check in ${nextRun} seconds")
     runIn(nextRun, 'poll')
 }
