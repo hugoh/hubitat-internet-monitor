@@ -4,6 +4,7 @@
  */
 
 import groovy.transform.Field
+import java.util.concurrent.Semaphore
 
 @Field static final String ICMP = 'ICMP'
 @Field static final String HTTP = 'HTTP'
@@ -76,8 +77,11 @@ preferences {
     input('logEnable', BOOL, title: 'Enable debug logging', defaultValue: false)
 }
 
+@Field private static Semaphore stateMutex = new Semaphore(1)
+
 void initializeState() {
     log.info("Initializing state for version ${version()}")
+    stateMutex.acquire()
     state.checkedUrls = splitString(settings.checkedUrls, DefaultCheckedUrls)
     state.pingHosts = splitString(settings.pingHosts, DefaultPingHosts)
     state.errorThresholds = [
@@ -91,6 +95,7 @@ void initializeState() {
     for (t in [HTTP, ICMP]) {
         state.warnThresholds[t] = (int) Math.floor(state.errorThresholds[t] * WARN_THRESHOLD)
     }
+    stateMutex.release()
 }
 
 void ensureValidState() {
@@ -208,7 +213,10 @@ boolean runChecks(List targets, String type) {
             break
         }
     }
-    Collections.rotate(targets, 1)
+    if (stateMutex.tryAcquire()) {
+        Collections.rotate(targets, 1)
+        stateMutex.release()
+    }
     logDebug("${type} checks successful: ${isUp}")
     return isUp
 }
