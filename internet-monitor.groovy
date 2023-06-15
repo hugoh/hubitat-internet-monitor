@@ -24,8 +24,9 @@ import groovy.transform.Field
 @Field static final int HTTP_TIMEOUT_DEFAULT = 20
 @Field static final BigDecimal WARN_THRESHOLD = 2 / 3
 @Field static final int HTTP_CHECK_INTERVAL = 500
+@Field static final int MAX_TRIES = 3
 
-public static final String version() { return '0.10.0' }
+static final String version() { return '0.10.0' }
 
 metadata {
     definition(
@@ -77,38 +78,10 @@ preferences {
     input('logEnable', BOOL, title: 'Enable debug logging', defaultValue: false)
 }
 
-void initializeState() {
-    log.info("Initializing state for version ${version()}")
-    state.checkedUrls = splitString(settings.checkedUrls, DefaultCheckedUrls)
-    state.pingHosts = splitString(settings.pingHosts, DefaultPingHosts)
-    state.errorThresholds = [
-        (HTTP): positiveValue(settings.httpThreshold),
-        (ICMP): positiveValue(settings.pingThreshold)
-    ]
-    state.httpTimeout = state.errorThresholds[HTTP] ? // This is in seconds for httpGet
-        (int) Math.ceil(state.errorThresholds[HTTP] / 1000) :
-        HTTP_TIMEOUT_DEFAULT
-    state.warnThresholds = [:]
-    for (t in [HTTP, ICMP]) {
-        state.warnThresholds[t] = (int) Math.floor(state.errorThresholds[t] * WARN_THRESHOLD)
-    }
-}
-
-void ensureValidState() {
-    if (state.checkedUrls &&
-        state.pingHosts &&
-        state.errorThresholds &&
-        state.httpTimeout) {
-        return
-    }
-    // Something's missing
-    initializeState()
-}
-
 void initialize() {
     log.info("Starting Internet checking loop - version ${version()}")
     initializeState()
-    checkInternetLoop()
+    poll()
 }
 
 void ping() {
@@ -125,7 +98,52 @@ void updated() {
     initialize()
 }
 
-boolean get(String uri) {
+void poll() {
+    boolean isUp = true
+    try {
+        isUp = checkInternetIsUp()
+    } catch (Exception ex) { // groovylint-disable-line CatchException
+        scheduleNextPoll(isUp)
+        throw(ex)
+    }
+    scheduleNextPoll(isUp)
+}
+
+private void scheduleNextPoll(boolean isUp) {
+    nextRun = isUp ? settings.pollingInterval : settings.pollingIntervalWhenDown
+    logDebug("Scheduling next check in ${nextRun} seconds")
+    runIn(nextRun, 'poll')
+}
+
+private void initializeState() {
+    log.info("Initializing state for version ${version()}")
+    state.checkedUrls = splitString(settings.checkedUrls, DefaultCheckedUrls)
+    state.pingHosts = splitString(settings.pingHosts, DefaultPingHosts)
+    state.errorThresholds = [
+        (HTTP): positiveValue(settings.httpThreshold),
+        (ICMP): positiveValue(settings.pingThreshold)
+    ]
+    state.httpTimeout = state.errorThresholds[HTTP] ? // This is in seconds for httpGet
+        (int) Math.ceil(state.errorThresholds[HTTP] / 1000) :
+        HTTP_TIMEOUT_DEFAULT
+    state.warnThresholds = [:]
+    for (t in [HTTP, ICMP]) {
+        state.warnThresholds[t] = (int) Math.floor(state.errorThresholds[t] * WARN_THRESHOLD)
+    }
+}
+
+private void ensureValidState() {
+    if (state.checkedUrls &&
+        state.pingHosts &&
+        state.errorThresholds &&
+        state.httpTimeout) {
+        return
+    }
+    // Something's missing
+    initializeState()
+}
+
+private boolean httpTest(String uri) {
     boolean ret
     req = [
         'uri': uri,
@@ -140,7 +158,7 @@ boolean get(String uri) {
     return ret
 }
 
-boolean ping(String host) {
+private boolean pingTest(String host) {
     logDebug("Sending ICMP ping to ${host}")
     hubitat.helper.NetworkUtils.PingData pingData = hubitat.helper.NetworkUtils.ping(host, 1)
     ret = pingData?.packetsReceived
@@ -148,19 +166,18 @@ boolean ping(String host) {
     return ret
 }
 
-boolean isTargetReachable(String target, String type) {
-    final int maxTries = 3
-    logDebug("[${type}] Testing ${target} at most ${maxTries} times")
+private boolean isTargetReachable(String target, String type) {
+    logDebug("[${type}] Testing ${target} at most ${MAX_TRIES} times")
     boolean reachable = false
     int i
-    for (i = 1; i <= maxTries; i++) {
+    for (i = 1; i <= MAX_TRIES; i++) {
         boolean reached
         start = now()
         try {
             if (type == HTTP) {
-                reached = get(target)
+                reached = httpTest(target)
             } else if (type == ICMP) {
-                reached = ping(target)
+                reached = pingTest(target)
             } else {
                 throw new IllegalArgumentException("Unsupported test type ${type}")
             }
@@ -193,13 +210,13 @@ boolean isTargetReachable(String target, String type) {
         sendEvent(name: LAST_UPDATE_LATENCY, value: reachedIn)
         logDebug("[${type}] Reached ${target} in ${reachedIn}ms after ${i} tries")
     } else {
-        log.error("[${type}] Could not reach ${target} after ${maxTries} tries")
+        log.error("[${type}] Could not reach ${target} after ${MAX_TRIES} tries")
     }
     logDebug("[${type}] Reached ${target}: ${reachable}")
     return reachable
 }
 
-boolean runChecks(List targets, String type) {
+private boolean runChecks(List targets, String type) {
     logDebug("Running ${type} checks")
     boolean isUp = false
     for (String target: targets) {
@@ -214,12 +231,17 @@ boolean runChecks(List targets, String type) {
     return isUp
 }
 
-boolean checkInternetIsUp() {
+private boolean checkInternetIsUp() {
     logDebug('Checking for Internet connectivity')
     ensureValidState()
     boolean isUp
     isUp = runChecks(state.checkedUrls, HTTP)
     isUp = isUp ?: runChecks(state.pingHosts, ICMP)
+    reportResults(isUp)
+    return isUp
+}
+
+private void reportResults(boolean isUp) {
     String now = new Date() // groovylint-disable-line NoJavaUtilDate
     String presence
     if (isUp) {
@@ -232,23 +254,15 @@ boolean checkInternetIsUp() {
     }
     sendEvent(name: PRESENCE, value: presence)
     sendEvent(name: LAST_UPDATE_TIME, value: now)
-    return isUp
-}
-
-void checkInternetLoop() {
-    boolean isUp = checkInternetIsUp()
-    nextRun = isUp ? settings.pollingInterval : settings.pollingIntervalWhenDown
-    logDebug("Scheduling next check in ${nextRun} seconds")
-    runIn(nextRun, 'checkInternetLoop')
 }
 
 // --------------------------------------------------------------------------
 
-BigDecimal positiveValue(BigDecimal v) {
+private BigDecimal positiveValue(BigDecimal v) {
     return v == null ? 0 : Math.max(v, (double) 0)
 }
 
-List splitString(String commaSeparatedString, List defaultValue) {
+private List splitString(String commaSeparatedString, List defaultValue) {
     if (commaSeparatedString == null) {
         log.info("No settings value, using default ${defaultValue}")
         return defaultValue
@@ -261,7 +275,7 @@ List splitString(String commaSeparatedString, List defaultValue) {
     return list
 }
 
-void logDebug(String msg) {
+private void logDebug(String msg) {
     if (logEnable) {
         log.debug(msg)
     }
