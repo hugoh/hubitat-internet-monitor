@@ -128,13 +128,14 @@ boolean get(String uri) {
     boolean ret
     req = [
         'uri': uri,
-        'timeout': state.httpTimeout
+        'timeout': state.httpTimeout,
+        'textParser': true
     ]
     logDebug("Sending HTTP request ${req}")
     httpGet(req) { resp ->
         ret = resp.isSuccess()
     }
-    logDebug("HTTP request ${req} success: ${ret}")
+    logDebug("HTTP request ${uri} success: ${ret}")
     return ret
 }
 
