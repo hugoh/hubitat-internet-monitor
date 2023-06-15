@@ -261,8 +261,8 @@ private void reportResults(boolean isUp) {
 
 // --------------------------------------------------------------------------
 
-private BigDecimal positiveValue(BigDecimal v) {
-    return v == null ? 0 : Math.max(v, (double) 0)
+private int positiveValue(BigInteger v) {
+    return v == null ? 0 : Math.max(v, 0)
 }
 
 private List splitString(String commaSeparatedString, List defaultValue) {
