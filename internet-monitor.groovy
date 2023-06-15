@@ -97,20 +97,25 @@ void updated() {
 }
 
 void poll() {
-    boolean isUp = true
     try {
-        isUp = checkInternetIsUp()
-    } catch (Exception ex) { // groovylint-disable-line CatchException
-        scheduleNextPoll(isUp)
-        throw(ex)
+        checkInternetIsUp()
+    } finally {
+        scheduleNextPoll()
     }
-    scheduleNextPoll(isUp)
 }
 
-private void scheduleNextPoll(boolean isUp) {
-    nextRun = isUp ? settings.checkInterval : settings.checkIntervalWhenDown
+private void scheduleNextPoll() {
+    nextRun = nextCheckIn()
     logDebug("Scheduling next check in ${nextRun} seconds")
     runIn(nextRun, 'poll')
+}
+
+private int nextCheckIn() {
+    if (device.currentValue(PRESENCE) == PRESENT_TRUE) {
+        return settings.checkInterval
+    } else {
+        return settings.checkIntervalWhenDown
+    }
 }
 
 private void initializeState() {
