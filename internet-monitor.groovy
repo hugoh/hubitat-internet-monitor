@@ -28,7 +28,7 @@ import groovy.transform.Field
 @Field static final int HTTP_CHECK_INTERVAL = 500
 @Field static final int MAX_TRIES = 3
 
-static final String version() { return '0.12.0' }
+static final String version() { return '0.13.0' }
 
 metadata {
     definition(
