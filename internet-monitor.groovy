@@ -218,17 +218,22 @@ private boolean isTargetReachable(String target, String type) {
     return reachable
 }
 
+@Field Random rnd = new Random() // groovylint-disable-line InsecureRandom
+
 private boolean runChecks(List targets, String type) {
     logDebug("Running ${type} checks")
     boolean isUp = false
-    for (String target: targets) {
+    int s = targets.size()
+    int i = rnd.nextInt(s)
+    for (j = 0; j < s; j++) {
+        String target = targets.get(i)
         if (isTargetReachable(target, type)) {
             sendEvent(name: LAST_REACHED_TARGET, value: target)
             isUp = true
             break
         }
+        i = (i + 1) % s
     }
-    Collections.rotate(targets, 1)
     logDebug("${type} checks successful: ${isUp}")
     return isUp
 }
@@ -269,12 +274,7 @@ private List splitString(String commaSeparatedString, List defaultValue) {
         log.info("No settings value, using default ${defaultValue}")
         return defaultValue
     }
-    String[] items = commaSeparatedString.split('[, ]+')
-    List<String> list = new ArrayList<String>(items.length)
-    for (String i: items) {
-        list.add(i)
-    }
-    return list
+    return commaSeparatedString.split('[, ]+')
 }
 
 private void logDebug(String msg) {
