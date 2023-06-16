@@ -122,11 +122,15 @@ private int nextCheckIn() {
 
 private void initializeState() {
     log.info("Initializing state for version ${version()}")
-    state.checkedUrls = splitString(settings.checkedUrls, DefaultCheckedUrls)
-    state.pingHosts = splitString(settings.pingHosts, DefaultPingHosts)
-    state.checkIndex = [
-        (HTTP): 0,
-        (ICMP): 0
+    state.clear()
+    state.targets = [
+        (HTTP): splitString(settings.checkedUrls, DefaultCheckedUrls),
+        (ICMP): splitString(settings.pingHosts, DefaultPingHosts)
+    ]
+    final short initialIndex = -1
+    state.targetIndex = [
+        (HTTP): initialIndex,
+        (ICMP): initialIndex
     ]
     state.errorThresholds = [
         (HTTP): positiveValue(settings.httpThreshold),
@@ -142,9 +146,8 @@ private void initializeState() {
 }
 
 private void ensureValidState() {
-    if (state.checkedUrls &&
-        state.pingHosts &&
-        state.checkIndex &&
+    if (state.targets &&
+        state.targetIndex &&
         state.errorThresholds &&
         state.httpTimeout) {
         return
@@ -225,14 +228,13 @@ private boolean isTargetReachable(String target, String type) {
     return reachable
 }
 
-private boolean runChecks(List targets, String type) {
+private boolean runChecks(String type) {
     logDebug("Running ${type} checks")
     boolean isUp = false
+    List targets = state.targets[type]
     int s = targets.size()
     for (j = 0; j < s; j++) {
-        int i = state.checkIndex[type]
-        String target = targets.get(i)
-        state.checkIndex[type] = (i + 1) % s
+        String target = targets.get(incTargetIndex(type))
         if (isTargetReachable(target, type)) {
             sendEvent(name: LAST_REACHED_TARGET, value: target)
             isUp = true
@@ -243,12 +245,18 @@ private boolean runChecks(List targets, String type) {
     return isUp
 }
 
+private short incTargetIndex(String type) {
+    short i = state.targetIndex[type] + 1
+    i %= state.targets[type].size()
+    state.targetIndex[type] = i
+    return i
+}
+
 private boolean checkInternetIsUp() {
     logDebug('Checking for Internet connectivity')
     ensureValidState()
     boolean isUp
-    isUp = runChecks(state.checkedUrls, HTTP)
-    isUp = isUp ?: runChecks(state.pingHosts, ICMP)
+    isUp = runChecks(HTTP) ?: runChecks(ICMP)
     reportResults(isUp)
     return isUp
 }
