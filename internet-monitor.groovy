@@ -22,7 +22,7 @@ import groovy.transform.Field
 
 @Field static final int ERROR_THRESHOLD_DEFAULT = 10000
 @Field static final int HTTP_TIMEOUT_DEFAULT = 20
-@Field static final BigDecimal WARN_THRESHOLD = 2 / 3
+@Field static final float WARN_THRESHOLD = (float) 2 / 3 // groovylint-disable-line NoFloat
 @Field static final int HTTP_CHECK_INTERVAL = 500
 @Field static final int MAX_TRIES = 3
 
@@ -172,7 +172,6 @@ private boolean pingTest(String host) {
 private boolean isTargetReachable(String target, String type) {
     logDebug("[${type}] Testing ${target} at most ${MAX_TRIES} times")
     boolean reachable = false
-    int i
     for (i = 1; i <= MAX_TRIES; i++) {
         boolean reached
         start = now()
@@ -261,7 +260,7 @@ private void reportResults(boolean isUp) {
 
 // --------------------------------------------------------------------------
 
-private int positiveValue(BigInteger v) {
+private int positiveValue(Long v) {
     return v == null ? 0 : Math.max(v, 0)
 }
 
