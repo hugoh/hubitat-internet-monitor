@@ -3,6 +3,8 @@
  * based on Ping Presence Sensor by Ashish Chaudhari
  */
 
+/* groovylint-disable  CompileStatic, DuplicateStringLiteral, DuplicateNumberLiteral */
+
 import groovy.transform.Field
 
 @Field static final String ICMP = 'ICMP'
@@ -113,15 +115,23 @@ private void scheduleNextPoll() {
 private int nextCheckIn() {
     if (device.currentValue(PRESENCE) == PRESENT_TRUE) {
         return settings.checkInterval
-    } else {
+    } else { //groovylint-disable-line UnnecessaryElseStatement
         return settings.checkIntervalWhenDown
     }
 }
 
 private void initializeState() {
     log.info("Initializing state for version ${version()}")
-    state.checkedUrls = splitString(settings.checkedUrls, DefaultCheckedUrls)
-    state.pingHosts = splitString(settings.pingHosts, DefaultPingHosts)
+    state.clear()
+    state.targets = [
+        (HTTP): splitString(settings.checkedUrls, DefaultCheckedUrls),
+        (ICMP): splitString(settings.pingHosts, DefaultPingHosts)
+    ]
+    final int initialIndex = -1
+    state.targetIndex = [
+        (HTTP): initialIndex,
+        (ICMP): initialIndex
+    ]
     state.errorThresholds = [
         (HTTP): positiveValue(settings.httpThreshold),
         (ICMP): positiveValue(settings.pingThreshold)
@@ -136,8 +146,8 @@ private void initializeState() {
 }
 
 private void ensureValidState() {
-    if (state.checkedUrls &&
-        state.pingHosts &&
+    if (state.targets &&
+        state.targetIndex &&
         state.errorThresholds &&
         state.httpTimeout) {
         return
@@ -155,7 +165,7 @@ private boolean httpTest(String uri) {
     ]
     logDebug("Sending HTTP request ${req}")
     httpGet(req) { resp ->
-        ret = resp.isSuccess()
+        ret = resp.isSuccess() //groovylint-disable-line UnnecessaryGetter
     }
     logDebug("HTTP request ${uri} success: ${ret}")
     return ret
@@ -218,27 +228,35 @@ private boolean isTargetReachable(String target, String type) {
     return reachable
 }
 
-private boolean runChecks(List targets, String type) {
+private boolean runChecks(String type) {
     logDebug("Running ${type} checks")
     boolean isUp = false
-    for (String target: targets) {
+    List targets = state.targets[type]
+    int s = targets.size()
+    for (j = 0; j < s; j++) {
+        String target = targets.get(incTargetIndex(type))
         if (isTargetReachable(target, type)) {
             sendEvent(name: LAST_REACHED_TARGET, value: target)
             isUp = true
             break
         }
     }
-    Collections.rotate(targets, 1)
     logDebug("${type} checks successful: ${isUp}")
     return isUp
+}
+
+private int incTargetIndex(String type) {
+    int i = state.targetIndex[type] + 1
+    i %= state.targets[type].size()
+    state.targetIndex[type] = i
+    return i
 }
 
 private boolean checkInternetIsUp() {
     logDebug('Checking for Internet connectivity')
     ensureValidState()
     boolean isUp
-    isUp = runChecks(state.checkedUrls, HTTP)
-    isUp = isUp ?: runChecks(state.pingHosts, ICMP)
+    isUp = runChecks(HTTP) ?: runChecks(ICMP)
     reportResults(isUp)
     return isUp
 }
@@ -269,12 +287,7 @@ private List splitString(String commaSeparatedString, List defaultValue) {
         log.info("No settings value, using default ${defaultValue}")
         return defaultValue
     }
-    String[] items = commaSeparatedString.split('[, ]+')
-    List<String> list = new ArrayList<String>(items.length)
-    for (String i: items) {
-        list.add(i)
-    }
-    return list
+    return commaSeparatedString.split('[, ]+')
 }
 
 private void logDebug(String msg) {
