@@ -3,6 +3,8 @@
  * based on Ping Presence Sensor by Ashish Chaudhari
  */
 
+/* groovylint-disable  CompileStatic, DuplicateStringLiteral, DuplicateNumberLiteral */
+
 import groovy.transform.Field
 
 @Field static final String ICMP = 'ICMP'
@@ -113,7 +115,7 @@ private void scheduleNextPoll() {
 private int nextCheckIn() {
     if (device.currentValue(PRESENCE) == PRESENT_TRUE) {
         return settings.checkInterval
-    } else {
+    } else { //groovylint-disable-line UnnecessaryElseStatement
         return settings.checkIntervalWhenDown
     }
 }
@@ -155,7 +157,7 @@ private boolean httpTest(String uri) {
     ]
     logDebug("Sending HTTP request ${req}")
     httpGet(req) { resp ->
-        ret = resp.isSuccess()
+        ret = resp.isSuccess() //groovylint-disable-line UnnecessaryGetter
     }
     logDebug("HTTP request ${uri} success: ${ret}")
     return ret
