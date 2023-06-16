@@ -124,6 +124,10 @@ private void initializeState() {
     log.info("Initializing state for version ${version()}")
     state.checkedUrls = splitString(settings.checkedUrls, DefaultCheckedUrls)
     state.pingHosts = splitString(settings.pingHosts, DefaultPingHosts)
+    state.checkIndex = [
+        (HTTP): 0,
+        (ICMP): 0
+    ]
     state.errorThresholds = [
         (HTTP): positiveValue(settings.httpThreshold),
         (ICMP): positiveValue(settings.pingThreshold)
@@ -140,6 +144,7 @@ private void initializeState() {
 private void ensureValidState() {
     if (state.checkedUrls &&
         state.pingHosts &&
+        state.checkIndex &&
         state.errorThresholds &&
         state.httpTimeout) {
         return
@@ -220,21 +225,19 @@ private boolean isTargetReachable(String target, String type) {
     return reachable
 }
 
-@Field Random rnd = new Random() // groovylint-disable-line InsecureRandom
-
 private boolean runChecks(List targets, String type) {
     logDebug("Running ${type} checks")
     boolean isUp = false
     int s = targets.size()
-    int i = rnd.nextInt(s)
     for (j = 0; j < s; j++) {
+        int i = state.checkIndex[type]
         String target = targets.get(i)
+        state.checkIndex[type] = (i + 1) % s
         if (isTargetReachable(target, type)) {
             sendEvent(name: LAST_REACHED_TARGET, value: target)
             isUp = true
             break
         }
-        i = (i + 1) % s
     }
     logDebug("${type} checks successful: ${isUp}")
     return isUp
