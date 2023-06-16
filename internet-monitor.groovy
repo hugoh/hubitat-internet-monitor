@@ -127,7 +127,7 @@ private void initializeState() {
         (HTTP): splitString(settings.checkedUrls, DefaultCheckedUrls),
         (ICMP): splitString(settings.pingHosts, DefaultPingHosts)
     ]
-    final short initialIndex = -1
+    final int initialIndex = -1
     state.targetIndex = [
         (HTTP): initialIndex,
         (ICMP): initialIndex
@@ -245,8 +245,8 @@ private boolean runChecks(String type) {
     return isUp
 }
 
-private short incTargetIndex(String type) {
-    short i = state.targetIndex[type] + 1
+private int incTargetIndex(String type) {
+    int i = state.targetIndex[type] + 1
     i %= state.targets[type].size()
     state.targetIndex[type] = i
     return i
