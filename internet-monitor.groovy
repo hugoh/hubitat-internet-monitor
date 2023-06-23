@@ -40,7 +40,7 @@ metadata {
     ) {
         capability 'PresenceSensor'
         capability 'HealthCheck'
-        capability 'Refresh'
+        capability 'Initialize'
 
         attribute LAST_REACHED_TARGET, STRING
         attribute LAST_REACHED_TIME, STRING
@@ -80,6 +80,7 @@ preferences {
 
 void initialize() {
     log.info("Starting Internet checking loop - version ${version()}")
+    unschedule()
     initializeState()
     poll()
 }
@@ -88,13 +89,7 @@ void ping() {
     checkInternetIsUp()
 }
 
-void refresh() {
-    updated()
-}
-
 void updated() {
-    log.info('Canceling any pending scheduled tasks')
-    unschedule()
     initialize()
 }
 
