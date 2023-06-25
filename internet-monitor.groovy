@@ -79,10 +79,16 @@ preferences {
 /* ------------------------------------------------------------------------------------------------------- */
 
 void installed() {
+    unsubscribe()
+    subscribe(location, 'systemStart', systemStart)
     initialize()
 }
 
 void updated() {
+    installed()
+}
+
+void systemStart(evt) { // groovylint-disable-line NoDef, MethodParameterTypeRequired, UnusedMethodParameter
     initialize()
 }
 
@@ -93,7 +99,7 @@ void uninstalled() {
 }
 
 void initialize() {
-    log.info("${app.label} version ${version()}")
+    log.info("${app.label} version ${version()} initializing")
     unschedule()
     initializeState()
     runIn(1, 'poll')
