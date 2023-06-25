@@ -102,7 +102,7 @@ void initialize() {
 
 /* ------------------------------------------------------------------------------------------------------- */
 
-private void poll() {
+void poll() {
     try {
         checkInternetIsUp()
     } finally {
