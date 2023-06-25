@@ -125,7 +125,7 @@ private int nextCheckIn() {
 }
 
 private DeviceWrapper presenceDevice() {
-    presenceSensorId = "internetUp:${app.id}"
+    presenceSensorId = "internet-monitor:up_presence:${app.id}"
     presenceSensorName = "${app.label} Sensor"
     return getChildDevice(presenceSensorId) ?:
         addChildDevice(HUBITAT_NAMESPACE, PRESENCE_DEVICE, presenceSensorId,
