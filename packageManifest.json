@@ -6,15 +6,15 @@
   "author": "Hugo Haas",
   "category": "Utility",
   "tags": "Cloud",
-  "drivers": [
+  "apps": [
      {
-      "id": "BB72907A-E68A-4012-85CE-E647ADA5E30C",
+      "id": "9E6C5948-8CF2-4253-9E14-B5E293E21A7A",
       "name": "internet-monitor",
       "namespace": "hugoh",
       "location": "https://raw.githubusercontent.com/hugoh/hubitat-internet-monitor/master/internet-monitor.groovy",
       "required": true,
       "oauth": false,
-      "description": "Internet monitor"
+      "description": "Internet monitoring application"
      }
   ]
 }
