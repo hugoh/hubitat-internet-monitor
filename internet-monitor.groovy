@@ -1,6 +1,5 @@
 /*
- * Internet connection sensor
- * based on Ping Presence Sensor by Ashish Chaudhari
+ * Internet connection monitor
  */
 
 /* groovylint-disable  CompileStatic, DuplicateStringLiteral, DuplicateNumberLiteral */
