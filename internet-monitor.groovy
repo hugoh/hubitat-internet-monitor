@@ -1,26 +1,23 @@
 /*
- * Internet connection sensor
- * based on Ping Presence Sensor by Ashish Chaudhari
+ * Internet connection monitor
  */
 
 /* groovylint-disable  CompileStatic, DuplicateStringLiteral, DuplicateNumberLiteral */
 
 import groovy.transform.Field
+import com.hubitat.app.DeviceWrapper
 
 @Field static final String ICMP = 'ICMP'
 @Field static final String HTTP = 'HTTP'
-@Field static final String LAST_REACHED_TARGET = 'lastReachedTarget'
-@Field static final String LAST_REACHED_TIME = 'lastReachedTime'
-@Field static final String LAST_UPDATE_TIME = 'lastUpdateTime'
-@Field static final String LAST_UPDATE_LATENCY = 'lastUpdateLatency'
 
 @Field static final String BOOL = 'bool'
 @Field static final String NUMBER = 'number'
 @Field static final String STRING = 'string'
 
+@Field static final String HUBITAT_NAMESPACE = 'hubitat'
+@Field static final String PRESENCE_DEVICE = 'Virtual Presence'
 @Field static final String PRESENCE = 'presence'
 @Field static final String PRESENT_TRUE = 'present'
-@Field static final String PRESENT_FALSE = 'not present'
 
 @Field static final int ERROR_THRESHOLD_DEFAULT = 10000
 @Field static final int HTTP_TIMEOUT_DEFAULT = 20
@@ -30,68 +27,85 @@ import groovy.transform.Field
 
 static final String version() { return '0.13.1' }
 
-metadata {
-    definition(
-        name: 'Internet Connection Sensor',
-        namespace: 'hugoh',
-        author: 'Hugo Haas',
-        importUrl: 'https://github.com/hugoh/hubitat-internet-monitor/blob/master/internet-monitor.groovy',
-        singleThreaded: true
-    ) {
-        capability 'PresenceSensor'
-        capability 'HealthCheck'
-        capability 'Initialize'
-
-        attribute LAST_REACHED_TARGET, STRING
-        attribute LAST_REACHED_TIME, STRING
-        attribute LAST_UPDATE_TIME, STRING
-        attribute LAST_UPDATE_LATENCY, NUMBER
-    }
-}
+definition(
+    name: 'Internet Connection Monitor',
+    namespace: 'hugoh',
+    author: 'Hugo Haas',
+    description: 'Application monitoring the internet connection via HTTP & ICMP checks',
+    iconUrl: '',
+    iconX2Url: '',
+    category: 'Utility',
+    importUrl: 'https://github.com/hugoh/hubitat-internet-monitor/blob/master/internet-monitor.groovy',
+    singleThreaded: true
+)
 
 @Field static final List DefaultCheckedUrls = [
     'http://www.gstatic.com/generate_204',
     'http://www.msftncsi.com/ncsi.txt',
     'http://detectportal.firefox.com/'
-    ]
+]
 @Field static final List DefaultPingHosts = [
     '1.1.1.1',
     '8.8.8.8',
     '9.9.9.9'
-    ]
+]
 
 preferences {
-    input('checkInterval', NUMBER, title: 'Polling interval in seconds when Internet is up',
-        defaultValue: 300, required: true)
-    input('checkIntervalWhenDown', NUMBER, title: 'Polling interval in seconds when Internet is down',
-        defaultValue: 60, required: true)
-    input('checkedUrls', STRING, title: 'URLs to check via HTTP',
-        description: 'Comma-separated list of URLs',
-        defaultValue: DefaultCheckedUrls.join(','), required: true)
-    input('pingHosts', STRING, title: 'Hosts to check via ping',
-        description: 'Comma-separated list of IP addresses or hostnames',
-        defaultValue: DefaultPingHosts.join(','), required: true)
-    input('httpThreshold', NUMBER, title: 'Error latency threshold for HTTP checks (in ms)',
-        defaultValue: ERROR_THRESHOLD_DEFAULT, required: true)
-    input('pingThreshold', NUMBER, title: 'Error latency threshold for ping checks (in ms)',
-        defaultValue: ERROR_THRESHOLD_DEFAULT)
-    input('logEnable', BOOL, title: 'Enable debug logging', defaultValue: false)
+    section('Polling Intervals') {
+        input('checkInterval', NUMBER, title: 'Polling interval in seconds when Internet is up',
+            defaultValue: 300, required: true)
+        input('checkIntervalWhenDown', NUMBER, title: 'Polling interval in seconds when Internet is down',
+            defaultValue: 60, required: true)
+    }
+    section('Checked Endpoints') {
+        input('checkedUrls', STRING, title: 'URLs to check via HTTP',
+            description: 'Comma-separated list of URLs',
+            defaultValue: DefaultCheckedUrls.join(','), required: true)
+        input('pingHosts', STRING, title: 'Hosts to check via ping',
+            description: 'Comma-separated list of IP addresses or hostnames',
+            defaultValue: DefaultPingHosts.join(','), required: true)
+    }
+    section('Error Thresholds') {
+        input('httpThreshold', NUMBER, title: 'Error latency threshold for HTTP checks (in ms)',
+            defaultValue: ERROR_THRESHOLD_DEFAULT, required: true)
+        input('pingThreshold', NUMBER, title: 'Error latency threshold for ping checks (in ms)',
+            defaultValue: ERROR_THRESHOLD_DEFAULT)
+    }
+    section('Debugging') {
+        input('logEnable', BOOL, title: 'Enable debug logging', defaultValue: false)
+    }
 }
 
-void initialize() {
-    log.info("Starting Internet checking loop - version ${version()}")
-    unschedule()
-    initializeState()
-    poll()
-}
+/* ------------------------------------------------------------------------------------------------------- */
 
-void ping() {
-    checkInternetIsUp()
+void installed() {
+    unsubscribe()
+    subscribe(location, 'systemStart', systemStart)
+    initialize()
 }
 
 void updated() {
+    installed()
+}
+
+void systemStart(evt) { // groovylint-disable-line NoDef, MethodParameterTypeRequired, UnusedMethodParameter
     initialize()
 }
+
+void uninstalled() {
+    for (device in getChildDevices()) { // groovylint-disable-line UnnecessaryGetter
+        deleteChildDevice(device.deviceNetworkId)
+    }
+}
+
+void initialize() {
+    log.info("${app.label} version ${version()} initializing")
+    unschedule()
+    initializeState()
+    runIn(1, 'poll')
+}
+
+/* ------------------------------------------------------------------------------------------------------- */
 
 void poll() {
     try {
@@ -108,15 +122,23 @@ private void scheduleNextPoll() {
 }
 
 private int nextCheckIn() {
-    if (device.currentValue(PRESENCE) == PRESENT_TRUE) {
+    if (presenceDevice().currentValue(PRESENCE) == PRESENT_TRUE) {
         return settings.checkInterval
     } else { //groovylint-disable-line UnnecessaryElseStatement
         return settings.checkIntervalWhenDown
     }
 }
 
+private DeviceWrapper presenceDevice() {
+    presenceSensorId = "internet-monitor:up_presence:${app.id}"
+    presenceSensorName = "${app.label} Sensor"
+    return getChildDevice(presenceSensorId) ?:
+        addChildDevice(HUBITAT_NAMESPACE, PRESENCE_DEVICE, presenceSensorId,
+                       [name: presenceSensorName, isComponent: true])
+}
+
 private void initializeState() {
-    log.info("Initializing state for version ${version()}")
+    log.info("Initializing state for ${app.name} version ${version()}")
     state.clear()
     state.targets = [
         (HTTP): splitString(settings.checkedUrls, DefaultCheckedUrls),
@@ -138,6 +160,7 @@ private void initializeState() {
     for (t in [HTTP, ICMP]) {
         state.warnThresholds[t] = (int) Math.floor(state.errorThresholds[t] * WARN_THRESHOLD)
     }
+    assert presenceDevice() != null
 }
 
 private void ensureValidState() {
@@ -214,7 +237,6 @@ private boolean isTargetReachable(String target, String type) {
         }
     }
     if (reachable) {
-        sendEvent(name: LAST_UPDATE_LATENCY, value: reachedIn)
         logDebug("[${type}] Reached ${target} in ${reachedIn}ms after ${i} tries")
     } else {
         log.error("[${type}] Could not reach ${target} after ${MAX_TRIES} tries")
@@ -231,7 +253,6 @@ private boolean runChecks(String type) {
     for (j = 0; j < s; j++) {
         String target = targets.get(incTargetIndex(type))
         if (isTargetReachable(target, type)) {
-            sendEvent(name: LAST_REACHED_TARGET, value: target)
             isUp = true
             break
         }
@@ -257,21 +278,14 @@ private boolean checkInternetIsUp() {
 }
 
 private void reportResults(boolean isUp) {
-    String now = new Date() // groovylint-disable-line NoJavaUtilDate
-    String presence
     if (isUp) {
-        presence = PRESENT_TRUE
-        sendEvent(name: LAST_REACHED_TIME, value: now)
+        presenceDevice().arrived()
         log.info('Internet is up')
     } else {
-        presence = PRESENT_FALSE
+        presenceDevice().departed()
         log.error('Internet is down: all tests failed')
     }
-    sendEvent(name: PRESENCE, value: presence)
-    sendEvent(name: LAST_UPDATE_TIME, value: now)
 }
-
-// --------------------------------------------------------------------------
 
 private int positiveValue(Long v) {
     return v == null ? 0 : Math.max(v, 0)

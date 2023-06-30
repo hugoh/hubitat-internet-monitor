@@ -1,11 +1,13 @@
 # Hubitat Internet Connection Monitor
 
-This is a Hubitat driver to report on whether the Internet connection is up or
-down.
+*Version: 0.13.1*
 
-The driver exposes a presence sensor:
-* When the internet is up, the presence sensor is set to present.
-* When the internet is detected as down, it is set as not present.
+This is a user application for Hubitat to report on whether the Internet
+connection is up or down.
+
+The application exposes a child presence sensor:
+* When the internet is up, the presence sensor is set to *present*.
+* When the internet is detected as down, it is set as *not present*.
 
 ## Logic
 
@@ -26,9 +28,15 @@ The list of URLs and hosts are configurable and rotated after each test.
 When the connection is up, tests are run every 5 minutes (configurable). When
 it's down, they're run every minute (also configurable).
 
+## Upgrading from version 0.x to 1.x
+
+Version 0.x ran as a device driver. When upgrading to version 1.x, you will want
+to add a user app, and select "Internet Connection Monitor". You can then copy
+your configuration there, and this will create a new, child presence sensor.
+
+You can then delete your old device driver.
+
 ## Credits
 
-The code was initially based on [achaudhari's ping presence
-sensor](https://github.com/achaudhari/hubitat-drivers/tree/cee6fc7b9682da862ff7b497ed096e0014d4c8f7/ping-presence-sensor),
-but there isn't much of it left at this point. Thank you for the inspiration
-though.
+The original code was initially based on [achaudhari's ping presence
+sensor](https://github.com/achaudhari/hubitat-drivers/tree/cee6fc7b9682da862ff7b497ed096e0014d4c8f7/ping-presence-sensor).
