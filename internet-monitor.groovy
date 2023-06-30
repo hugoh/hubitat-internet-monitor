@@ -25,7 +25,7 @@ import com.hubitat.app.DeviceWrapper
 @Field static final int HTTP_CHECK_INTERVAL = 500
 @Field static final int MAX_TRIES = 3
 
-static final String version() { return '0.13.1' }
+static final String version() { return '1.0.0' }
 
 definition(
     name: 'Internet Connection Monitor',

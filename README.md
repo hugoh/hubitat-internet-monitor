@@ -1,6 +1,6 @@
 # Hubitat Internet Connection Monitor
 
-*Version: 0.13.1*
+*Version: 1.0.0*
 
 This is a user application for Hubitat to report on whether the Internet
 connection is up or down.
